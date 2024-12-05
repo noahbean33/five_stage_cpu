@@ -70,7 +70,7 @@ The Verilog Processor is a basic custom-designed CPU that supports arithmetic an
 ### **2. Steps**
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-repo-name.git
+   git clone https://github.com/noahbean33/verilog_processor.git
    cd verilog_processor
    ```
 2. Run the simulation for a specific testbench:
@@ -80,6 +80,42 @@ The Verilog Processor is a basic custom-designed CPU that supports arithmetic an
    ```
 
 3. Observe the simulation output and validate results.
+
+---
+
+## **Future Possibilities**
+
+This processor serves as a foundational implementation that can be extended with the following features:
+
+1. **Pipelining:**
+   - Add instruction pipelining to improve processor efficiency and throughput by overlapping instruction fetch, decode, and execute stages.
+
+2. **Interrupt and Exception Handling:**
+   - Implement mechanisms to handle hardware and software interrupts, exceptions, and error recovery.
+
+3. **Cache Memory:**
+   - Integrate caching to optimize memory access and reduce latency.
+
+4. **Peripheral Interfaces:**
+   - Add interfaces to communicate with peripherals such as I/O devices, UART, or GPIO.
+
+5. **Advanced Arithmetic:**
+   - Extend the instruction set to include division, floating-point operations, and other advanced arithmetic.
+
+6. **Dynamic Branch Prediction:**
+   - Implement branch prediction to reduce control hazards during branching.
+
+7. **Multithreading:**
+   - Introduce multithreading capabilities to execute multiple instruction streams concurrently.
+
+8. **Instruction Expansion:**
+   - Add support for complex instructions, including bit manipulation, shifts, and specialized operations.
+
+9. **Enhanced Testing:**
+   - Include formal verification and additional corner-case test scenarios to ensure robustness.
+
+10. **FPGA Deployment:**
+    - Adapt the design for implementation on FPGA hardware for practical demonstrations.
 
 ---
 
