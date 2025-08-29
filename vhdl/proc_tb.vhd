@@ -56,19 +56,38 @@ report "--------------------------------";
 report "Immediate Addition : GPR3 -> GPR0 + IMM_DATA";
 IR <= "00010" & "00011" & "00000" & '1' & "00000" & "00000000111";
 wait for 20 ns;
-
---------- perform multiplication of gpr0 and gpr1, store result in gpr2 and gpr3
---------- gpr2 = lsb(gpr0*gpr1), gpr3 = msb(gpr0*gpr1)
+ 
+ 
+--------- perform logical OR of gpr0 and gpr1 and store result in gp3
+--------- gpr4 = gpr1 | gpr0
 report "--------------------------------";
-report "Register Multiplication : GPR2 -> LSB(GPR0 * GPR1)";
-IR <= "00100" & "00010" & "00000" & '0' & "00001" & "00000000000";
+report "Register OR : GPR4 -> GPR0 | GPR1";
+IR <= "00101" & "00100" & "00000" & '0' & "00001" & "00000000000";
 wait for 20 ns;
-
+ 
+ 
+--------- perform logical AND of gpr0 and imm_data and store result in gp4
+--------- gpr5 = gpr0 & imm_data
 report "--------------------------------";
-report "Move SGPR to GPR3 : GPR3 -> MSB(GPR0 * GPR1)";
-IR <= "00000" & "00011" & "00000" & '0' & "00000" & "00000000000";
+report "Immediate and : GPR5 -> GPR0 & imm_data";
+IR <= "00110" & "00101" & "00000" & '1' & "00000" & "00000111111";
 wait for 20 ns;
-
+ 
+--------- mov gpr(6) = 0101010101010101
+report "--------------------------------";
+report "Immediate Move : GPR6 -> 21845";
+IR <= "00001" & "00110" & "00000" & '1' & "01010" & "10101010101";
+wait for 20 ns;
+ 
+--------- perform logical XOR of gpr6 and imm_data and store result in gp8
+--------- gpr8 = gpr6 | imm_data
+report "--------------------------------";
+report "Immediate XOR : GPR8 -> GPR6 ^ imm_data";
+IR <= "00111" & "01000" & "00110" & '1' & "01100" & "00000111111";
+wait for 20 ns;
+ 
+ 
+ 
 stop;
 end process;
  
