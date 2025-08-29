@@ -4,6 +4,7 @@ use ieee.numeric_std.all;
 use std.env.stop;
  
  
+ 
 entity proc_tb is
 end proc_tb;
  
@@ -42,7 +43,22 @@ IR <= "00001" & "00001" & "00000" & '1' & "00000" & "00000000001";
 wait for 20 ns;
  
  
+--------- perform addition of gpr0 and gpr1, store result in gpr2
+--------- gpr2 = gpr1 + gpr0
+report "--------------------------------";
+report "Register Addition : GPR2 -> GPR0 + GPR1";
+IR <= "00010" & "00010" & "00001" & '0' & "00000" & "00000000000";
+wait for 20 ns;
+ 
+--------- perform addition of gpr0 and immediate data, store result in gpr2
+--------- gpr3 = gpr0 + imm_data
+report "--------------------------------";
+report "Immediate Addition : GPR3 -> GPR0 + IMM_DATA";
+IR <= "00010" & "00011" & "00000" & '1' & "00000" & "00000000111";
+wait for 20 ns;
+ 
 stop;
 end process;
+ 
  
 end behavioral;

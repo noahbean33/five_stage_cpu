@@ -3,16 +3,11 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use ieee.std_logic_unsigned.all;
  
- 
- 
 entity proc_top is
 port(
 IR : in std_logic_vector(31 downto 0)
 );
 end proc_top;
- 
- 
- 
  
 architecture Behavioral of proc_top is
  
@@ -20,6 +15,11 @@ architecture Behavioral of proc_top is
  
 constant mov     : std_logic_vector(4 downto 0) := "00001";
  
+ 
+constant add     : std_logic_vector(4 downto 0) := "00010";
+constant sub     : std_logic_vector(4 downto 0) := "00011";
+constant mul     : std_logic_vector(4 downto 0) := "00100";
+constant movsgpr : std_logic_vector(4 downto 0) := "00000";
  
  
 ----------------------------------------------------------------------------------
@@ -32,15 +32,24 @@ constant mov     : std_logic_vector(4 downto 0) := "00001";
 -- <--- oper --><-- rdest --><-- rsrc1 --><--modesel--><-- immediate_date --> 
  
  
+-----------------------------------------------------------------------------------------------
+-------------------Handling Multiplication of 16-bit
+signal mul_res : std_logic_vector(31 downto 0);
+signal SGPR : std_logic_vector(15 downto 0); ----msb of multiplication
+------------------------------------------------------------------------------------------------
+signal add_res : std_logic_vector(16 downto 0);
+-----------------------------------------------------------------
+ 
+ 
 ---------------- General Purpose Register
  
 type GPR_ARR is array (31 downto 0) of std_logic_vector(15 downto 0);
-----------------------Initialization of GPR
+---------------------Initialization of GPR
 signal GPR : GPR_ARR := (others => (others => '0')); 
  
- 
- 
 begin
+ 
+ 
  
  
 ------------------decode and execute instruction
@@ -48,8 +57,9 @@ begin
 inst_decode: process(all)
 begin
  
-    case(IR(31 downto 27)) is
- 
+case(IR(31 downto 27)) is
+              
+             
              --------Mov register to register
              when mov =>
              if(IR(16) = '1') then
@@ -58,13 +68,50 @@ begin
              GPR(to_integer(unsigned(IR(26 downto 22)))) <= GPR(to_integer(unsigned(IR(21 downto 17))));
              end if;
              
+             -----------addition 
+             when add => 
              
              
-             -----------------default state
-             when others => 
-             null;
+             if(IR(16) = '1') then
+             add_res <= ('0' & GPR(to_integer(unsigned(IR(21 downto 17))))) + ('0' & IR(15 downto 0));
+             else
+             add_res <= ('0' & GPR(to_integer(unsigned(IR(21 downto 17))))) + ('0' & GPR(to_integer(unsigned(IR(15 downto 11))))); 
+             end if; 
              
-    end case;
+             GPR(to_integer(unsigned(IR(26 downto 22)))) <= add_res(15 downto 0); ------- storing result in dest GPR without carry
+             
+             ---------------subtraction 
+             when sub => 
+             if(IR(16) = '1') then
+             GPR(to_integer(unsigned(IR(26 downto 22)))) <= GPR(to_integer(unsigned(IR(21 downto 17)))) - IR(15 downto 0);
+             else
+             GPR(to_integer(unsigned(IR(26 downto 22)))) <= GPR(to_integer(unsigned(IR(21 downto 17)))) - GPR(to_integer(unsigned(IR(15 downto 11)))); 
+             end if; 
+             ----------------multiplication 
+             when mul =>
+             
+            
+             
+             if(IR(16) = '1') then
+             mul_res <= GPR(to_integer(unsigned(IR(21 downto 17)))) * IR(15 downto 0);
+             else
+             mul_res <= GPR(to_integer(unsigned(IR(21 downto 17)))) * GPR(to_integer(unsigned(IR(15 downto 11)))); 
+             
+             GPR(to_integer(unsigned(IR(26 downto 22)))) <= mul_res(15 downto 0);
+             SGPR <= mul_res(31 downto 16);
+             
+             end if; 
+            
+                    ---------mov special register to GPR
+             when movsgpr => 
+             GPR(to_integer(unsigned(IR(26 downto 22)))) <= SGPR;
+ 
+             
+             
+ when others => 
+ null;
+ 
+end case;
 end process;
  
  
