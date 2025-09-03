@@ -13,7 +13,9 @@ use std.textio.all;
  
 entity proc_top is
 port(
-IR : in std_logic_vector(31 downto 0)
+sys_rst, clk : in std_logic;
+din : in std_logic_vector(15 downto 0); ---outside data to proc
+dout : out std_logic_Vector(15 downto 0)--- proc to outside world
 );
 end proc_top;
  
@@ -36,6 +38,13 @@ constant lnand   : std_logic_vector(4 downto 0) := "01001";
 constant lnor    : std_logic_vector(4 downto 0) := "01010";
 constant lnot    : std_logic_vector(4 downto 0) := "01011";
  
+----------------  load and store instructions
+constant storereg   : std_logic_vector(4 downto 0) := "01100"; ---store reg in data memory
+constant storedin   : std_logic_vector(4 downto 0) := "01101"; ---store din in data memory
+constant storeimm   : std_logic_vector(4 downto 0) := "01110"; ---store imm_data in data memory
+constant senddm   : std_logic_vector(4 downto 0) := "01111";   ----send data memory to dout
+constant sendreg    : std_logic_vector(4 downto 0) := "10000"; ----send reg to dout
+constant sendimm    : std_logic_vector(4 downto 0) := "10001"; ----send imm to dout
  
  
  
@@ -65,11 +74,16 @@ signal add_res : std_logic_vector(16 downto 0);
 type GPR_ARR is array (31 downto 0) of std_logic_vector(15 downto 0);
 signal GPR : GPR_ARR := (others => (others => '0'));
 -------------------------------------------------------------------
+----------------- data memory
+ 
+type data_memory is array (63 downto 0) of std_logic_vector(15 downto 0);
+signal data_mem : data_memory := (others => (others => '0'));
+ 
  
  
 -------------------------------------- Instruction_decode + fectch
  
-procedure decode_execute (signal IR : in std_logic_vector(31 downto 0); signal GPR : inout GPR_ARR; signal add_res : out std_logic_Vector(16 downto 0); signal mul_res :out std_logic_vector(31 downto 0); signal SGPR : out std_logic_Vector(15 downto 0) ) is
+procedure decode_execute (signal IR : in std_logic_vector(31 downto 0); signal dout : out std_logic_Vector(15 downto 0); signal data_mem : inout data_memory; signal din : in std_logic_Vector(15 downto 0); signal GPR : inout GPR_ARR; signal add_res : out std_logic_Vector(16 downto 0); signal mul_res :out std_logic_vector(31 downto 0); signal SGPR : out std_logic_Vector(15 downto 0) ) is
 begin
  
 case(IR(31 downto 27)) is
@@ -167,6 +181,38 @@ case(IR(31 downto 27)) is
          GPR(to_integer(unsigned(IR(26 downto 22)))) <=  NOT GPR(to_integer(unsigned(IR(21 downto 17))));  
        end if;           
                                       
+      ------------------- store reg (addr : src1) in data memory (addr : rdst)
+      when storereg =>
+         data_mem(to_integer(unsigned(IR(26 downto 22)))) <= GPR(to_integer(unsigned(IR(21 downto 17))));
+            
+     ----------------- store din in data memory (addr : rdst) 
+     when storedin =>        
+         data_mem(to_integer(unsigned(IR(26 downto 22)))) <= din;
+         
+     ----------------  store imm data in data memory (addr : rdst) 
+     
+     when storeimm =>
+          data_mem(to_integer(unsigned(IR(26 downto 22)))) <= IR(15 downto 0);
+       
+      ------------------ send data memory (addr : rdst) to dout
+      
+      when senddm  =>      
+           dout <=   data_mem(to_integer(unsigned(IR(26 downto 22))));
+           
+      -------------- send GPR ( addr : rdst) to dout      
+      when sendreg  =>
+           
+           dout <= GPR(to_integer(unsigned(IR(26 downto 22))));
+     
+     ------------- send imm data to dout   
+      when sendimm  =>
+           
+           dout <= IR(15 downto 0);
+  
+  
+  
+  
+  
                              
               
     when others  => 
@@ -255,37 +301,56 @@ end loop;
 return pdata;
 end function;
  
-signal inst_mem : program_memory := load_program("program_memory.mem");
- 
------------------ data memory
- 
-type data_memory is array (63 downto 0) of std_logic_vector(15 downto 0);
-signal data_mem : data_memory := (others => (others => '0'));
+signal inst_mem : program_memory := load_program("C:/Users/kumar/project_23/project_23.srcs/sim_1/new/program.txt");
  
  
+-------------------- program counter and delay counter
+ 
+signal PC : integer := 0;
+signal delay_count : integer := 0;
+signal IR : std_logic_vector(31 downto 0) := (others => '0');
  
 begin
  
  
-------------------decode and execute instruction
  
-inst_decode: process(all)
-variable flag_s : std_logic_vector(3 downto 0):= "0000";
+----------------------control fsm
+---------------- program counter logic
+ 
+process(clk)
 begin
-  decode_execute(IR, GPR, add_res, mul_res, SGPR);
-  flag_s := condition_flag(IR, SGPR, add_res);
-  
-  sign_o <= flag_s(0);
-  carry_o <= flag_s(1);
-  zero_o <= flag_s(2);
-  overflow_o <= flag_s(3);
+if(sys_rst = '1') then
+  PC <= 0;  -----pc will store address of next instruction to be executed
+  delay_count <= 0; -----delay_count delay reading of next instruction
+elsif (rising_edge(clk)) then
+  if(delay_count < 6) then
+       delay_count <= delay_count + 1;
+   else
+       delay_count <= 0;
+       PC <= PC + 1;
+   end if;
+end if;
+ 
 end process;
  
+--------------------
  
+process(all)
+variable flag_s : std_logic_vector(3 downto 0):= "0000";
+begin
+if (sys_rst = '1') then
+   IR <= (others => '0');
+else
+      IR <= inst_mem(PC);
+      decode_execute(IR, dout, data_mem, din, GPR, add_res, mul_res, SGPR);
+      flag_s := condition_flag(IR, SGPR, add_res); 
+      sign_o <= flag_s(0);
+      carry_o <= flag_s(1);
+      zero_o <= flag_s(2);
+      overflow_o <= flag_s(3);
  
------------------------control FSM
- 
- 
+end if;
+end process;
  
  
  

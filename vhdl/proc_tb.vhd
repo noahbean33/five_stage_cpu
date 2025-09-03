@@ -12,100 +12,59 @@ architecture Behavioral of proc_tb is
  
 component proc_top is
 port(
-IR : in std_logic_vector(31 downto 0)
+sys_rst, clk : in std_logic;
+din : in std_logic_vector(15 downto 0);
+dout : out std_logic_Vector(15 downto 0)
 );
 end component;
  
-signal IR : std_logic_vector(31 downto 0) := (others => '0');
- 
+signal sys_rst, clk : std_logic;
+signal din  : std_logic_vector(15 downto 0);
+signal dout : std_logic_Vector(15 downto 0);
 begin
  
-proc_inst: proc_top port map (IR => IR);
---------------------
+proc_inst: proc_top port map (sys_rst, clk, din, dout);
  
-process 
+ 
+process
 begin
--- instruction register  <--ir[31:27]--><--ir[26:22]--><--ir[21:17]--><--ir[16]--><--ir[15:11]--><--ir[10:0]-->
---                       <---  oper  --><--   rdest --><--   rsrc1 --><--modesel--><--  rsrc2 --><--unused  -->             
- 
- 
--------- movi gpr(0) = 3
-report "--------------------------------";
-report "Immediate Move : GPR0 -> 3";
-IR <= "00001" & "00000" & "00000" & '1' & "00000" & "00000000011";
-wait for 20 ns;
- 
- 
---------- mov gpr(1) = 1
-report "--------------------------------";
-report "Immediate Move : GPR1 -> 1";
-IR <= "00001" & "00001" & "00000" & '1' & "00000" & "00000000001";
-wait for 20 ns;
- 
- 
---------- perform addition of gpr0 and gpr1, store result in gpr2
---------- gpr2 = gpr1 + gpr0
-report "--------------------------------";
-report "Register Addition : GPR2 -> GPR0 + GPR1";
-IR <= "00010" & "00010" & "00001" & '0' & "00000" & "00000000000";
-wait for 20 ns;
- 
---------- perform addition of gpr0 and immediate data, store result in gpr2
---------- gpr3 = gpr1 + imm_data
-report "--------------------------------";
-report "Immediate Addition : GPR3 -> GPR0 + IMM_DATA";
-IR <= "00010" & "00011" & "00000" & '1' & "00000" & "00000000111";
-wait for 20 ns;
- 
---------- perform logical OR of gpr0 and gpr1 and store result in gp3
---------- gpr4 = gpr1 | gpr0
-report "--------------------------------";
-report "Register OR : GPR4 -> GPR0 | GPR1";
-IR <= "00101" & "00100" & "00000" & '0' & "00001" & "00000000000";
-wait for 20 ns;
- 
- 
---------- perform logical AND of gpr0 and imm_data and store result in gp4
---------- gpr5 = gpr0 | imm_data
-report "--------------------------------";
-report "Immediate and : GPR5 -> GPR0 & imm_data";
-IR <= "00110" & "00101" & "00000" & '1' & "00000" & "00000111111";
-wait for 20 ns;
- 
---------- mov gpr(6) = 0101010101010101
-report "--------------------------------";
-report "Immediate Move : GPR6 -> 21845";
-IR <= "00001" & "00110" & "00000" & '1' & "01010" & "10101010101";
-wait for 20 ns;
- 
---------- perform logical XOR of gpr6 and imm_data and store result in gp8
---------- gpr8 = gpr6 ^ imm_data
-report "--------------------------------";
-report "Immediate XOR : GPR8 -> GPR6 ^ imm_data";
-IR <= "00111" & "01000" & "00110" & '1' & "01100" & "00000111111";
-wait for 20 ns;
- 
------------------Trigger Zero flag
-report "--------------------------------";
-report "Immediate add : GPR11 -> GPR10 + imm_data(0)";
-IR <= "00010" & "01011" & "01010" & '1' & "00000" & "00000000000";
-wait for 20 ns;
- 
- 
------------------Trigger Carry Flag
-report "--------------------------------";
-report "Register add : GPR14 -> GPR12 + GPR13";
-IR <= "00001" & "01100" & "00000" & '1' & x"8001"; ---mov r12 = 8001
-wait for 20 ns;
-IR <= "00001" & "01101" & "00000" & '1' & x"8002"; ---mov r13 = 8002
-wait for 20 ns;
-IR <= "00010" & "01110" & "01100" & '0' & "01101" & "00000000000";-- r14 = r12 + r13
-wait for 20 ns;
- 
- 
- 
-stop;
+clk <= '1';
+wait for 10 ns;
+clk <= '0';
+wait for 10 ns;
 end process;
+ 
+ 
+process
+begin
+sys_rst <= '0';
+wait for 30 ns;
+end process;
+ 
+ 
+ 
+ 
+---------------------Trigger Carry Flag
+----report "--------------------------------";
+----report "Register add : GPR14 -> GPR12 + GPR13";
+----IR <= "00001" & "01100" & "00000" & '1' & x"8001"; ---mov r12 = 8001
+----wait for 20 ns;
+----IR <= "00001" & "01101" & "00000" & '1' & x"8002"; ---mov r13 = 8002
+----wait for 20 ns;
+----IR <= "00010" & "01110" & "01100" & '0' & "01101" & "00000000000";-- r14 = r12 + r13
+----wait for 20 ns;
+ 
+ 
+ 
+-------------------- store result of r14 in DM @ 0
+ 
+--IR  <= "01100" & "00000" & "01110" & '0' & "00000" &  "00000000000" ;
+ 
+--------------------- send dm content to dout
+ 
+--IR <= "01111" & "00000" & "00000" & '0' & "00000" &  "00000000000" ;
+ 
+--------------------  
  
  
  
