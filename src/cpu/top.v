@@ -1,16 +1,14 @@
-// Top-level SoC wrapper: instantiates CPU and program memory
 `include "cpu.v"
 `include "progmem.v"
 module top(
     input rst, clk,
     output [31:0] cycle
   );
-  // Shared instruction/data memory interface
-  wire [31:0] mem_rdata, mem_wdata, addr; // read data from memory, write data to memory, and address bus
-  wire rstrb;                             // memory read strobe from CPU
-  wire [3:0] wr_strobe;                   // byte write-enable mask to memory
+  wire [31:0] mem_rdata, mem_wdata, addr;
+  wire rstrb;
+  wire [3:0] wr_strobe;
   
-  // Instantiate CPU core: issues instruction fetches and optional data writes
+  //Instantiate sub modules
   cpu cpu0(
         .rst(rst), .clk(clk),
         .mem_rdata(mem_rdata),
@@ -21,7 +19,6 @@ module top(
         .mem_wstrb(wr_strobe)
       );
 
-  // Program memory: loads firmware.hex and services CPU reads/writes
   progmem mem0(
             .rst(rst), .clk(clk),
             .addr(addr),

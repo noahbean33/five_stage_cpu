@@ -6,7 +6,12 @@ R-type, I type and Branch instr included
 Shift operator implemented (SLL/SLLI, SRL/SRLI)
 Load and store implemented
 Jump implementing
-
+Bug: Arithmetic right shift SRA, SRAI not working
+Bug: LH, LB, SH, SB, LBU, LHU not working
+Revised on: 16/04/2025
+Bug fixed on 24/4/2025: LB, SB, LH, SH tested 
+LBU, LHU: implemented but not tested
+Reordering of state variable, No of state reduced
 */
 module cpu(
     input rst, clk,
@@ -17,11 +22,6 @@ module cpu(
     output reg [31:0] cycle,
     output [3:0] mem_wstrb //write strobe mask for writing data to mem
   );
-  // Port summary:
-  // - mem_addr/mem_rstrb: address and read strobe for instruction/data fetch
-  // - mem_wdata/mem_wstrb: data and byte write enables for stores
-  // - mem_rdata: synchronous read data from memory
-  // - cycle: running cycle counter (halts increment in HLT)
 
   reg [31:0] regfile[0:31];//Register file with X0 to X31;
   reg [31:0] addr, data_rs1, data_rs2; //address bus
@@ -106,116 +106,125 @@ module cpu(
   //Generate memory read/write strobe signal and address -bug in address calculation
   //wire load_store_state_flag = ((state==BYTE1)|(state==BYTE2)|(state==BYTE3)|(state==BYTE4));
   wire load_store_state_flag = (state==BYTE);
+  wire [31:0] load_store_addr = (load_store_state_flag |(state==WAIT_LOADING))?alu_result:0;
+  wire mem_byteAccess     = data[13:12] == 2'b00; // funct3[1:0] == 2'b00;
+  wire mem_halfwordAccess = data[13:12] == 2'b01; // funct3[1:0] == 2'b01;
   // Load operation
-  wire LOAD_sign = !data[14] & (mem_byteAccess ? LOAD_byte[7] : LOAD_halfword[15]); // load sign
-  wire [31:0] load_data_tmp = mem_byteAccess ? {{24{LOAD_sign}}, LOAD_byte} : // load data (byte)
-       mem_halfwordAccess ? {{16{LOAD_sign}}, LOAD_halfword} : mem_rdata; // load data (halfword or word)
+  wire LOAD_sign = !data[14] & (mem_byteAccess ? LOAD_byte[7] : LOAD_halfword[15]);
+  wire [31:0] load_data_tmp = mem_byteAccess ? {{24{LOAD_sign}},  LOAD_byte} :
+       mem_halfwordAccess ? {{16{LOAD_sign}}, LOAD_halfword} : mem_rdata ;
 
-  // Store operation
-  wire [15:0] LOAD_halfword = load_store_addr[1] ? mem_rdata[31:16] : mem_rdata[15:0]; // load halfword
-  wire [7:0] LOAD_byte = load_store_addr[0] ? LOAD_halfword[15:8] : LOAD_halfword[7:0]; // load byte
+  wire [15:0] LOAD_halfword = load_store_addr[1] ? mem_rdata[31:16] : mem_rdata[15:0];
+
+  wire  [7:0] LOAD_byte =
+        load_store_addr[0] ? LOAD_halfword[15:8] : LOAD_halfword[7:0];
 
   // The mask for memory-write.
-  wire [3:0] STORE_wmask = mem_byteAccess ? (load_store_addr[1] ? (load_store_addr[0] ? 4'b1000 : 4'b0100) : (load_store_addr[0] ? 4'b0010 : 4'b0001)) : // byte write mask
-       mem_halfwordAccess ? (load_store_addr[1] ? 4'b1100 : 4'b0011) : 4'b1111; // halfword or word write mask
 
-  // Assign memory write strobe
-  assign mem_wstrb = {4{(state==WAIT_LOADING) & isStype}} & STORE_wmask; // memory write strobe
+  wire [3:0] STORE_wmask = mem_byteAccess ?  (load_store_addr[1] ?
+       (load_store_addr[0] ? 4'b1000 : 4'b0100) :
+       (load_store_addr[0] ? 4'b0010 : 4'b0001)) :
+       mem_halfwordAccess ? (load_store_addr[1] ? 4'b1100 : 4'b0011) : 4'b1111;
 
-  // Generate memory address for load or store operation
-  assign mem_addr = ((isStype | isLtype) & (load_store_state_flag |(state==WAIT_LOADING))) ? load_store_addr: addr; // memory address
+  //verify this line wstrb
+  //assign mem_wstrb = {4{(state==BYTE) & isStype}} & STORE_wmask;
+assign mem_wstrb = {4{(state==WAIT_LOADING) & isStype}} & STORE_wmask;
 
-  // Generate memory read strobe signal
-  assign mem_rstrb = (state==WAIT) | (isLtype & load_store_state_flag); // memory read strobe
+  //Generate memory address for load or store operation
+  assign mem_addr = ((isStype | isLtype) & (load_store_state_flag |(state==WAIT_LOADING))) ? load_store_addr: addr;//calculate address for instruction/data to be stored or fetched
+  //Generate memory read strobe signal
+  assign mem_rstrb = (state==WAIT) | (isLtype & load_store_state_flag);//need to be modified for load instr
+  // STORE op mem_wdata calculation
+  assign mem_wdata[ 7: 0] = data_rs2[7:0];
+  assign mem_wdata[15: 8] = load_store_addr[0] ? data_rs2[7:0]  : data_rs2[15: 8];
+  assign mem_wdata[23:16] = load_store_addr[1] ? data_rs2[7:0]  : data_rs2[23:16];
+  assign mem_wdata[31:24] = load_store_addr[0] ? data_rs2[7:0]  :
+         load_store_addr[1] ? data_rs2[15:8] : data_rs2[31:24];
 
-  // Store operation
-  assign mem_wdata[7:0] = data_rs2[7:0]; // store byte
-  assign mem_wdata[15:8] = load_store_addr[0] ? data_rs2[7:0] : data_rs2[15:8]; // store halfword
-  assign mem_wdata[23:16] = load_store_addr[1] ? data_rs2[7:0] : data_rs2[23:16]; // store halfword
-  assign mem_wdata[31:24] = load_store_addr[0] ? data_rs2[7:0] : load_store_addr[1] ? data_rs2[15:8] : data_rs2[31:24]; // store word
 
   initial
   begin
     cycle = 0;
-    state = 0;
+    state=0;
     addr = 0;
-    regfile[0] = 0; // X0 register is always 0
+    regfile[0] = 0;//X0 reg is always 0
   end
 
-  // Clock-dependent operation
+  //clock dependent operation
+
   always @(posedge clk)
   begin
-    if (rst)
+    if(rst)
     begin
       addr <= 0;
       state <= RESET;
       data <= 32'h0;
     end
     else
-    case (state)
-      RESET: // If reset is pressed
+    case(state)
+      RESET: //If reset is pressed
       begin
-        if (rst)
+        if(rst)
           state <= RESET;
         else
           state <= WAIT;
       end
-
       WAIT:
-      begin
+      begin//this state provides 1 cycle delay to fetch data from progmem
         state <= FETCH;
+        //loc <= 0; //reset the loc to point 1st mem location
       end
 
-      FETCH: // Fetch data from program memory
+      FETCH: //Fetch data from progmem RAM
       begin
-        data <= mem_rdata;
+        data <= mem_rdata; //latch mem read data into reg
         state <= DECODE;
       end
 
-      DECODE: // Decoding of different instruction and generate signal
+      DECODE: //Decoding of different instruction and generate signal
       begin
         data_rs1 <= regfile[data[19:15]];
         data_rs2 <= regfile[data[24:20]];
-        state <= ~isSystype ? EXECUTE : HLT;
+        state <= ~isSystype? EXECUTE:  HLT;
       end
 
       EXECUTE:
       begin
-        addr <= (isBtype & TAKE_BRANCH) | isJAL ? pcplusimm : isJALR ? alu_result : pcplus4;
-        state <= !(isStype | isLtype | isJAL | isJALR) ? WAIT : BYTE;
+        addr <= (isBtype & TAKE_BRANCH)| isJAL ? pcplusimm : isJALR? alu_result: pcplus4;
+        state <= !(isStype|isLtype|isJAL|isJALR) ? WAIT: BYTE;
+
       end
 
-      BYTE: // State value is 5
+      BYTE://state value is 5
       begin
+        //give one intermediate clock delay
         state <= WAIT_LOADING;
       end
-
       WAIT_LOADING:
-      begin
         state <= WAIT;
-      end
+
     endcase
   end
-
-  // *** Clock cycle counter ***
+ 
+  //*** clock cycle counter **//
   always @(posedge clk)
   begin
-    if (rst)
+    if(rst)
       cycle <= 0;
     else
     begin
-      if (state != HLT)
+      if(state != HLT)
         cycle <= cycle + 1;
     end
   end
 
-  // ** Register file write back data **
-  wire write_reg_en = ((isItype | isRtype | isJAL | isJALR | isLUI | isAUIPC) & (state == EXECUTE)) | (isLtype & (state == WAIT_LOADING));
-  wire [31:0] write_reg_data = (isItype | isRtype) ? alu_result : // ALU result
-       isLtype ? load_data_tmp : // load data
-       (isJAL | isJALR) ? pcplus4 : // JAL/JALR result
-       isLUI ? U_data : // LUI result
-       isAUIPC ? pcplusimm : 0; // AUIPC result
+
+  // ** Register file write back data **//
+  wire write_reg_en = ((isItype|isRtype|isJAL|isJALR|isLUI|isAUIPC) &(state==EXECUTE))|(isLtype & (state==WAIT_LOADING));
+  wire [31:0] write_reg_data = (isItype |isRtype) ? alu_result:
+       isLtype ? load_data_tmp:
+       (isJAL|isJALR)? pcplus4:
+       isLUI? U_data:
        isAUIPC?pcplusimm:0;
 
 
